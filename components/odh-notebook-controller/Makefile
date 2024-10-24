@@ -9,7 +9,7 @@ KF_TAG ?= main-648689f
 CONTAINER_ENGINE ?= podman
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.23
+ENVTEST_K8S_VERSION = 1.26
 
 # Kubernetes configuration
 K8S_NAMESPACE ?= odh-notebook-controller-system
