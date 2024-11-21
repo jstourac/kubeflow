@@ -21,7 +21,9 @@ WEBHOOK_PORT = 8443
 WEBHOOK_CERT_DIR = /tmp/k8s-webhook-server/serving-certs
 
 # E2E tests additional flags
-E2E_TEST_FLAGS = "--skip-deletion=false" # See README.md
+E2E_TEST_FLAGS = "-skip-deletion=false" # See README.md
+
+DEBUG ?= false
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set).
 ifeq (,$(shell go env GOBIN))
@@ -100,6 +102,13 @@ test-with-rbac-true: manifests generate fmt vet envtest ## Run tests.
 	ACK_GINKGO_DEPRECATIONS=1.16.5 \
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" \
 		go test ./controllers/... -ginkgo.v -ginkgo.progress -test.v -coverprofile cover.out
+
+.PHONY: debug
+debug: manifests generate fmt vet envtest dlv ## Run tests.
+	export SET_PIPELINE_RBAC=true && \
+    ACK_GINKGO_DEPRECATIONS=1.16.5 \
+    KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" \
+		$(DLV) --headless --listen=127.0.0.1:46725 test ./controllers/...
 
 ##@ Build
 
@@ -205,23 +214,31 @@ undeploy: setup undeploy-kf ## Undeploy controller from the Openshift cluster.
 undeploy-dev: setup undeploy-kf ## Undeploy controller from the Openshift cluster.
 	$(KUSTOMIZE) build config/development | oc delete --ignore-not-found=true -f -
 
-e2e-test-%:
+e2e-test-%: dlv
 	$(eval deploymentMode:=$(subst e2e-test-,,$@))
-	go test ./e2e/ -run ^TestE2ENotebookController -v \
-		--nb-namespace=$(K8S_NAMESPACE) \
-		--deploymentMode=$(deploymentMode) \
-		${E2E_TEST_FLAGS}
+	if $(DEBUG); then \
+		$(DLV) --headless --listen=127.0.0.1:46725 test ./e2e/ \
+			-- -test.v \
+			-nb-namespace=$(K8S_NAMESPACE) \
+			-deploymentMode=$(deploymentMode) \
+			${E2E_TEST_FLAGS}; \
+	else \
+		go test ./e2e/ -run ^TestE2ENotebookController -test.v \
+			-nb-namespace=$(K8S_NAMESPACE) \
+			-deploymentMode=$(deploymentMode) \
+			${E2E_TEST_FLAGS}; \
+	fi
 
 .PHONY: e2e-test
 e2e-test: e2e-test-oauth ## Run e2e tests for the controller with oauth proxy
 
 .PHONY: run-ci-e2e-tests
 run-ci-e2e-tests:
-	bash ./run-e2e-test.sh
+	DEBUG=$(DEBUG) bash ./run-e2e-test.sh
 
 .PHONY: run-ci-e2e-tests-service-mesh
 run-ci-e2e-service-mesh-tests:
-	bash ./run-e2e-test-service-mesh.sh
+	DEBUG=$(DEBUG) bash ./run-e2e-test-service-mesh.sh
 
 ##@ Build Dependencies
 
@@ -249,3 +266,8 @@ KTUNNEL = $(LOCALBIN)/ktunnel
 .PHONY: ktunnel
 ktunnel: ## Download ktunnel locally if necessary.
 	GOBIN=$(LOCALBIN) go install github.com/omrikiei/ktunnel@v1.4.8
+
+DLV = $(LOCALBIN)/dlv
+.PHONY: dlv
+dlv: ## Download dlv locally if necessary.
+	GOBIN=$(LOCALBIN) go install github.com/go-delve/delve/cmd/dlv@latest

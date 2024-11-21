@@ -41,4 +41,4 @@ oc new-project "${TEST_NAMESPACE}"
 
 # deploy and run e2e tests
 make deploy
-make e2e-test
+make -e DEBUG="${DEBUG}" e2e-test

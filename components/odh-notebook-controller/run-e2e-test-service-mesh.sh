@@ -41,4 +41,4 @@ oc new-project "${TEST_NAMESPACE}" --skip-config-write
 
 # deploy and run e2e tests
 make deploy-service-mesh deploy-with-mesh
-make e2e-test-service-mesh
+make -e DEBUG="${DEBUG}" e2e-test-service-mesh
