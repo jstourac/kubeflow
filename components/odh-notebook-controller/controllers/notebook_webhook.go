@@ -97,9 +97,129 @@ func InjectReconciliationLock(meta *metav1.ObjectMeta) error {
 	return nil
 }
 
+// validateOAuthProxyResources validates the OAuth proxy resource annotations and ensures
+// that requests <= limits for both CPU and memory.
+func validateOAuthProxyResources(notebook *nbv1.Notebook) error {
+	annotations := notebook.GetAnnotations()
+	if annotations == nil {
+		return nil
+	}
+
+	// Parse resources from annotations
+	cpuRequest, cpuRequestErr := parseResourceQuantity(annotations[AnnotationOAuthProxyCPURequest])
+	memoryRequest, memoryRequestErr := parseResourceQuantity(annotations[AnnotationOAuthProxyMemoryRequest])
+	cpuLimit, cpuLimitErr := parseResourceQuantity(annotations[AnnotationOAuthProxyCPULimit])
+	memoryLimit, memoryLimitErr := parseResourceQuantity(annotations[AnnotationOAuthProxyMemoryLimit])
+
+	// Check for invalid resource values
+	if cpuRequestErr != nil {
+		return fmt.Errorf("invalid CPU request value '%s': %w", annotations[AnnotationOAuthProxyCPURequest], cpuRequestErr)
+	}
+	if memoryRequestErr != nil {
+		return fmt.Errorf("invalid memory request value '%s': %w", annotations[AnnotationOAuthProxyMemoryRequest], memoryRequestErr)
+	}
+	if cpuLimitErr != nil {
+		return fmt.Errorf("invalid CPU limit value '%s': %w", annotations[AnnotationOAuthProxyCPULimit], cpuLimitErr)
+	}
+	if memoryLimitErr != nil {
+		return fmt.Errorf("invalid memory limit value '%s': %w", annotations[AnnotationOAuthProxyMemoryLimit], memoryLimitErr)
+	}
+
+	// Validate that requests are less than or equal to limits
+	if cpuRequest != nil && cpuLimit != nil && cpuRequest.Cmp(*cpuLimit) > 0 {
+		return fmt.Errorf("CPU request (%s) cannot be greater than CPU limit (%s)", cpuRequest.String(), cpuLimit.String())
+	}
+
+	if memoryRequest != nil && memoryLimit != nil && memoryRequest.Cmp(*memoryLimit) > 0 {
+		return fmt.Errorf("memory request (%s) cannot be greater than memory limit (%s)", memoryRequest.String(), memoryLimit.String())
+	}
+
+	return nil
+}
+
+// parseResourceQuantity parses a resource quantity string, returning nil if the annotation is not set
+func parseResourceQuantity(value string) (*resource.Quantity, error) {
+	if value == "" {
+		return nil, nil
+	}
+	quantity, err := resource.ParseQuantity(value)
+	if err != nil {
+		return nil, err
+	}
+	return &quantity, nil
+}
+
+// getOAuthProxyResourceRequirements extracts resource requirements from notebook annotations,
+// falling back to default values if annotations are not present.
+func getOAuthProxyResourceRequirements(notebook *nbv1.Notebook) corev1.ResourceRequirements {
+	// Default values
+	defaultCPU := resource.MustParse("100m")
+	defaultMemory := resource.MustParse("64Mi")
+
+	annotations := notebook.GetAnnotations()
+	if annotations == nil {
+		return corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				"cpu":    defaultCPU,
+				"memory": defaultMemory,
+			},
+			Limits: corev1.ResourceList{
+				"cpu":    defaultCPU,
+				"memory": defaultMemory,
+			},
+		}
+	}
+
+	// Parse resource values from annotations
+	cpuRequest, _ := parseResourceQuantity(annotations[AnnotationOAuthProxyCPURequest])
+	memoryRequest, _ := parseResourceQuantity(annotations[AnnotationOAuthProxyMemoryRequest])
+	cpuLimit, _ := parseResourceQuantity(annotations[AnnotationOAuthProxyCPULimit])
+	memoryLimit, _ := parseResourceQuantity(annotations[AnnotationOAuthProxyMemoryLimit])
+
+	// Use annotation values if present, otherwise use defaults
+	finalCPURequest := defaultCPU
+	if cpuRequest != nil {
+		finalCPURequest = *cpuRequest
+	}
+
+	finalMemoryRequest := defaultMemory
+	if memoryRequest != nil {
+		finalMemoryRequest = *memoryRequest
+	}
+
+	finalCPULimit := defaultCPU
+	if cpuLimit != nil {
+		finalCPULimit = *cpuLimit
+	}
+
+	finalMemoryLimit := defaultMemory
+	if memoryLimit != nil {
+		finalMemoryLimit = *memoryLimit
+	}
+
+	return corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			"cpu":    finalCPURequest,
+			"memory": finalMemoryRequest,
+		},
+		Limits: corev1.ResourceList{
+			"cpu":    finalCPULimit,
+			"memory": finalMemoryLimit,
+		},
+	}
+}
+
 // InjectOAuthProxy injects the OAuth proxy sidecar container in the Notebook
 // spec
 func InjectOAuthProxy(notebook *nbv1.Notebook, oauth OAuthConfig) error {
+	// Validate OAuth proxy resource annotations before proceeding
+	if err := validateOAuthProxyResources(notebook); err != nil {
+		return fmt.Errorf("OAuth proxy resource validation failed: %w", err)
+	}
+
+	// Get resource requirements from annotations or use defaults
+	resourceRequirements := getOAuthProxyResourceRequirements(notebook)
+
 	// https://pkg.go.dev/k8s.io/api/core/v1#Container
 	proxyContainer := corev1.Container{
 		Name:            "oauth-proxy",
@@ -165,16 +285,7 @@ func InjectOAuthProxy(notebook *nbv1.Notebook, oauth OAuthConfig) error {
 			SuccessThreshold:    1,
 			FailureThreshold:    3,
 		},
-		Resources: corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{
-				"cpu":    resource.MustParse("100m"),
-				"memory": resource.MustParse("64Mi"),
-			},
-			Limits: corev1.ResourceList{
-				"cpu":    resource.MustParse("100m"),
-				"memory": resource.MustParse("64Mi"),
-			},
-		},
+		Resources: resourceRequirements,
 		VolumeMounts: []corev1.VolumeMount{
 			{
 				Name:      "oauth-client",

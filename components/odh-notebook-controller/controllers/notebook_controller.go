@@ -54,6 +54,10 @@ const (
 	AnnotationServiceMesh             = "opendatahub.io/service-mesh"
 	AnnotationValueReconciliationLock = "odh-notebook-controller-lock"
 	AnnotationLogoutUrl               = "notebooks.opendatahub.io/oauth-logout-url"
+	AnnotationOAuthProxyCPURequest    = "notebooks.opendatahub.io/oauth-proxy-cpu-request"
+	AnnotationOAuthProxyMemoryRequest = "notebooks.opendatahub.io/oauth-proxy-memory-request"
+	AnnotationOAuthProxyCPULimit      = "notebooks.opendatahub.io/oauth-proxy-cpu-limit"
+	AnnotationOAuthProxyMemoryLimit   = "notebooks.opendatahub.io/oauth-proxy-memory-limit"
 )
 
 const (

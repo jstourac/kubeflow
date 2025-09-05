@@ -23,6 +23,7 @@ import (
 	imagev1 "github.com/openshift/api/image/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -338,3 +339,422 @@ func toMetav1Time(timeString string) metav1.Time {
 	Expect(err).ToNot(HaveOccurred())
 	return metav1.NewTime(parsedTime)
 }
+
+var _ = Describe("OAuth Proxy Resource Configuration", func() {
+	Context("Resource validation", func() {
+		It("should validate valid resource annotations", func() {
+			notebook := &nbv1.Notebook{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-notebook",
+					Namespace: "default",
+					Annotations: map[string]string{
+						AnnotationOAuthProxyCPURequest:    "200m",
+						AnnotationOAuthProxyMemoryRequest: "128Mi",
+						AnnotationOAuthProxyCPULimit:      "500m",
+						AnnotationOAuthProxyMemoryLimit:   "256Mi",
+					},
+				},
+			}
+
+			err := validateOAuthProxyResources(notebook)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should reject invalid CPU request format", func() {
+			notebook := &nbv1.Notebook{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-notebook",
+					Namespace: "default",
+					Annotations: map[string]string{
+						AnnotationOAuthProxyCPURequest: "invalid-cpu",
+					},
+				},
+			}
+
+			err := validateOAuthProxyResources(notebook)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("invalid CPU request value"))
+		})
+
+		It("should reject invalid memory request format", func() {
+			notebook := &nbv1.Notebook{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-notebook",
+					Namespace: "default",
+					Annotations: map[string]string{
+						AnnotationOAuthProxyMemoryRequest: "invalid-memory",
+					},
+				},
+			}
+
+			err := validateOAuthProxyResources(notebook)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("invalid memory request value"))
+		})
+
+		It("should reject invalid CPU limit format", func() {
+			notebook := &nbv1.Notebook{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-notebook",
+					Namespace: "default",
+					Annotations: map[string]string{
+						AnnotationOAuthProxyCPULimit: "invalid-cpu",
+					},
+				},
+			}
+
+			err := validateOAuthProxyResources(notebook)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("invalid CPU limit value"))
+		})
+
+		It("should reject invalid memory limit format", func() {
+			notebook := &nbv1.Notebook{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-notebook",
+					Namespace: "default",
+					Annotations: map[string]string{
+						AnnotationOAuthProxyMemoryLimit: "invalid-memory",
+					},
+				},
+			}
+
+			err := validateOAuthProxyResources(notebook)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("invalid memory limit value"))
+		})
+
+		It("should reject CPU request greater than CPU limit", func() {
+			notebook := &nbv1.Notebook{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-notebook",
+					Namespace: "default",
+					Annotations: map[string]string{
+						AnnotationOAuthProxyCPURequest: "500m",
+						AnnotationOAuthProxyCPULimit:   "200m",
+					},
+				},
+			}
+
+			err := validateOAuthProxyResources(notebook)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("CPU request (500m) cannot be greater than CPU limit (200m)"))
+		})
+
+		It("should reject memory request greater than memory limit", func() {
+			notebook := &nbv1.Notebook{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-notebook",
+					Namespace: "default",
+					Annotations: map[string]string{
+						AnnotationOAuthProxyMemoryRequest: "512Mi",
+						AnnotationOAuthProxyMemoryLimit:   "256Mi",
+					},
+				},
+			}
+
+			err := validateOAuthProxyResources(notebook)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("memory request (512Mi) cannot be greater than memory limit (256Mi)"))
+		})
+
+		It("should allow equal requests and limits", func() {
+			notebook := &nbv1.Notebook{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-notebook",
+					Namespace: "default",
+					Annotations: map[string]string{
+						AnnotationOAuthProxyCPURequest:    "200m",
+						AnnotationOAuthProxyCPULimit:      "200m",
+						AnnotationOAuthProxyMemoryRequest: "128Mi",
+						AnnotationOAuthProxyMemoryLimit:   "128Mi",
+					},
+				},
+			}
+
+			err := validateOAuthProxyResources(notebook)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should allow partial annotation sets", func() {
+			notebook := &nbv1.Notebook{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-notebook",
+					Namespace: "default",
+					Annotations: map[string]string{
+						AnnotationOAuthProxyCPURequest: "200m",
+					},
+				},
+			}
+
+			err := validateOAuthProxyResources(notebook)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should handle empty annotations", func() {
+			notebook := &nbv1.Notebook{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-notebook",
+					Namespace: "default",
+				},
+			}
+
+			err := validateOAuthProxyResources(notebook)
+			Expect(err).ToNot(HaveOccurred())
+		})
+	})
+
+	Context("Resource requirements extraction", func() {
+		It("should use default values when no annotations are present", func() {
+			notebook := &nbv1.Notebook{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-notebook",
+					Namespace: "default",
+				},
+			}
+
+			resources := getOAuthProxyResourceRequirements(notebook)
+
+			Expect(resources.Requests.Cpu().String()).To(Equal("100m"))
+			Expect(resources.Requests.Memory().String()).To(Equal("64Mi"))
+			Expect(resources.Limits.Cpu().String()).To(Equal("100m"))
+			Expect(resources.Limits.Memory().String()).To(Equal("64Mi"))
+		})
+
+		It("should use annotation values when present", func() {
+			notebook := &nbv1.Notebook{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-notebook",
+					Namespace: "default",
+					Annotations: map[string]string{
+						AnnotationOAuthProxyCPURequest:    "200m",
+						AnnotationOAuthProxyMemoryRequest: "128Mi",
+						AnnotationOAuthProxyCPULimit:      "500m",
+						AnnotationOAuthProxyMemoryLimit:   "256Mi",
+					},
+				},
+			}
+
+			resources := getOAuthProxyResourceRequirements(notebook)
+
+			Expect(resources.Requests.Cpu().String()).To(Equal("200m"))
+			Expect(resources.Requests.Memory().String()).To(Equal("128Mi"))
+			Expect(resources.Limits.Cpu().String()).To(Equal("500m"))
+			Expect(resources.Limits.Memory().String()).To(Equal("256Mi"))
+		})
+
+		It("should mix annotation values with defaults", func() {
+			notebook := &nbv1.Notebook{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-notebook",
+					Namespace: "default",
+					Annotations: map[string]string{
+						AnnotationOAuthProxyCPURequest:  "200m",
+						AnnotationOAuthProxyMemoryLimit: "256Mi",
+					},
+				},
+			}
+
+			resources := getOAuthProxyResourceRequirements(notebook)
+
+			Expect(resources.Requests.Cpu().String()).To(Equal("200m"))
+			Expect(resources.Requests.Memory().String()).To(Equal("64Mi")) // default
+			Expect(resources.Limits.Cpu().String()).To(Equal("100m"))      // default
+			Expect(resources.Limits.Memory().String()).To(Equal("256Mi"))
+		})
+	})
+
+	Context("InjectOAuthProxy with resource configuration", func() {
+		It("should inject OAuth proxy with default resources when no annotations", func() {
+			notebook := &nbv1.Notebook{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-notebook",
+					Namespace: "default",
+				},
+				Spec: nbv1.NotebookSpec{
+					Template: nbv1.NotebookTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "test-notebook",
+									Image: "test-image",
+								},
+							},
+						},
+					},
+				},
+			}
+
+			oauth := OAuthConfig{
+				ProxyImage: "test-oauth-image",
+			}
+
+			err := InjectOAuthProxy(notebook, oauth)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Check that oauth-proxy container was added
+			var oauthContainer corev1.Container
+			found := false
+			for _, container := range notebook.Spec.Template.Spec.Containers {
+				if container.Name == "oauth-proxy" {
+					oauthContainer = container
+					found = true
+					break
+				}
+			}
+			Expect(found).To(BeTrue())
+
+			// Check that default resources are used
+			Expect(oauthContainer.Resources.Requests.Cpu().String()).To(Equal("100m"))
+			Expect(oauthContainer.Resources.Requests.Memory().String()).To(Equal("64Mi"))
+			Expect(oauthContainer.Resources.Limits.Cpu().String()).To(Equal("100m"))
+			Expect(oauthContainer.Resources.Limits.Memory().String()).To(Equal("64Mi"))
+		})
+
+		It("should inject OAuth proxy with custom resources when annotations present", func() {
+			notebook := &nbv1.Notebook{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-notebook",
+					Namespace: "default",
+					Annotations: map[string]string{
+						AnnotationOAuthProxyCPURequest:    "200m",
+						AnnotationOAuthProxyMemoryRequest: "128Mi",
+						AnnotationOAuthProxyCPULimit:      "500m",
+						AnnotationOAuthProxyMemoryLimit:   "256Mi",
+					},
+				},
+				Spec: nbv1.NotebookSpec{
+					Template: nbv1.NotebookTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "test-notebook",
+									Image: "test-image",
+								},
+							},
+						},
+					},
+				},
+			}
+
+			oauth := OAuthConfig{
+				ProxyImage: "test-oauth-image",
+			}
+
+			err := InjectOAuthProxy(notebook, oauth)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Check that oauth-proxy container was added
+			var oauthContainer corev1.Container
+			found := false
+			for _, container := range notebook.Spec.Template.Spec.Containers {
+				if container.Name == "oauth-proxy" {
+					oauthContainer = container
+					found = true
+					break
+				}
+			}
+			Expect(found).To(BeTrue())
+
+			// Check that custom resources are used
+			Expect(oauthContainer.Resources.Requests.Cpu().String()).To(Equal("200m"))
+			Expect(oauthContainer.Resources.Requests.Memory().String()).To(Equal("128Mi"))
+			Expect(oauthContainer.Resources.Limits.Cpu().String()).To(Equal("500m"))
+			Expect(oauthContainer.Resources.Limits.Memory().String()).To(Equal("256Mi"))
+		})
+
+		It("should fail injection when validation fails", func() {
+			notebook := &nbv1.Notebook{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-notebook",
+					Namespace: "default",
+					Annotations: map[string]string{
+						AnnotationOAuthProxyCPURequest: "500m",
+						AnnotationOAuthProxyCPULimit:   "200m", // limit < request
+					},
+				},
+				Spec: nbv1.NotebookSpec{
+					Template: nbv1.NotebookTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "test-notebook",
+									Image: "test-image",
+								},
+							},
+						},
+					},
+				},
+			}
+
+			oauth := OAuthConfig{
+				ProxyImage: "test-oauth-image",
+			}
+
+			err := InjectOAuthProxy(notebook, oauth)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("OAuth proxy resource validation failed"))
+			Expect(err.Error()).To(ContainSubstring("CPU request (500m) cannot be greater than CPU limit (200m)"))
+		})
+
+		It("should update existing oauth-proxy container resources", func() {
+			notebook := &nbv1.Notebook{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-notebook",
+					Namespace: "default",
+					Annotations: map[string]string{
+						AnnotationOAuthProxyCPURequest: "300m",
+						AnnotationOAuthProxyCPULimit:   "600m",
+					},
+				},
+				Spec: nbv1.NotebookSpec{
+					Template: nbv1.NotebookTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "test-notebook",
+									Image: "test-image",
+								},
+								{
+									Name:  "oauth-proxy",
+									Image: "old-oauth-image",
+									Resources: corev1.ResourceRequirements{
+										Requests: corev1.ResourceList{
+											corev1.ResourceCPU:    resource.MustParse("50m"),
+											corev1.ResourceMemory: resource.MustParse("32Mi"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			oauth := OAuthConfig{
+				ProxyImage: "test-oauth-image",
+			}
+
+			err := InjectOAuthProxy(notebook, oauth)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Check that oauth-proxy container was updated
+			var oauthContainer corev1.Container
+			found := false
+			for _, container := range notebook.Spec.Template.Spec.Containers {
+				if container.Name == "oauth-proxy" {
+					oauthContainer = container
+					found = true
+					break
+				}
+			}
+			Expect(found).To(BeTrue())
+
+			// Check that resources were updated
+			Expect(oauthContainer.Resources.Requests.Cpu().String()).To(Equal("300m"))
+			Expect(oauthContainer.Resources.Requests.Memory().String()).To(Equal("64Mi")) // default for memory
+			Expect(oauthContainer.Resources.Limits.Cpu().String()).To(Equal("600m"))
+			Expect(oauthContainer.Resources.Limits.Memory().String()).To(Equal("64Mi")) // default for memory
+		})
+	})
+})
