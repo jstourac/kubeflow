@@ -247,6 +247,11 @@ func (tc *testContext) testNotebookValidation(nbMeta *metav1.ObjectMeta) error {
 }
 
 func (tc *testContext) testNotebookRBACProxySidecar(nbMeta *metav1.ObjectMeta) error {
+	logger := GetHelperLogger().WithValues(
+		"notebook", nbMeta.Name,
+		"namespace", nbMeta.Namespace,
+		"test", "rbac-sidecar",
+	)
 
 	nbPods, err := tc.kubeClient.CoreV1().Pods(tc.testNamespace).List(tc.ctx, metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("statefulset=%s", nbMeta.Name)})
@@ -255,13 +260,80 @@ func (tc *testContext) testNotebookRBACProxySidecar(nbMeta *metav1.ObjectMeta) e
 		return fmt.Errorf("error retrieving Notebook pods :%v", err)
 	}
 
+	logger.V(1).Info("Checking RBAC sidecar for notebook pods",
+		"podCount", len(nbPods.Items))
+
 	for _, nbpod := range nbPods.Items {
+		logger.V(1).Info("Checking pod status",
+			"podName", nbpod.Name,
+			"phase", nbpod.Status.Phase,
+			"message", nbpod.Status.Message,
+			"reason", nbpod.Status.Reason)
+
 		if nbpod.Status.Phase != v1.PodRunning {
-			return fmt.Errorf("notebook pod %v is not in Running phase", nbpod.Name)
+			// Enhanced logging for non-running pods
+			logger.Info("Pod is not in Running phase - logging detailed status",
+				"podName", nbpod.Name,
+				"currentPhase", nbpod.Status.Phase,
+				"message", nbpod.Status.Message,
+				"reason", nbpod.Status.Reason,
+				"startTime", nbpod.Status.StartTime)
+
+			// Log container statuses for debugging
+			for _, containerStatus := range nbpod.Status.ContainerStatuses {
+				logger.Info("Container status for non-running pod",
+					"podName", nbpod.Name,
+					"containerName", containerStatus.Name,
+					"ready", containerStatus.Ready,
+					"restartCount", containerStatus.RestartCount,
+					"image", containerStatus.Image)
+
+				if containerStatus.State.Waiting != nil {
+					logger.Info("Container waiting state",
+						"podName", nbpod.Name,
+						"containerName", containerStatus.Name,
+						"reason", containerStatus.State.Waiting.Reason,
+						"message", containerStatus.State.Waiting.Message)
+				}
+
+				if containerStatus.State.Terminated != nil {
+					logger.Info("Container terminated state",
+						"podName", nbpod.Name,
+						"containerName", containerStatus.Name,
+						"reason", containerStatus.State.Terminated.Reason,
+						"message", containerStatus.State.Terminated.Message,
+						"exitCode", containerStatus.State.Terminated.ExitCode)
+				}
+			}
+
+			// Log pod conditions
+			for _, condition := range nbpod.Status.Conditions {
+				logger.Info("Pod condition for non-running pod",
+					"podName", nbpod.Name,
+					"type", condition.Type,
+					"status", condition.Status,
+					"reason", condition.Reason,
+					"message", condition.Message)
+			}
+
+			return fmt.Errorf("notebook pod %v is not in Running phase (current: %s, reason: %s, message: %s)",
+				nbpod.Name, nbpod.Status.Phase, nbpod.Status.Reason, nbpod.Status.Message)
 		}
+
 		for _, containerStatus := range nbpod.Status.ContainerStatuses {
 			if containerStatus.Name == "kube-rbac-proxy" {
 				if !containerStatus.Ready {
+					logger.Info("RBAC proxy container not ready",
+						"podName", nbpod.Name,
+						"ready", containerStatus.Ready,
+						"restartCount", containerStatus.RestartCount)
+
+					if containerStatus.State.Waiting != nil {
+						logger.Info("RBAC proxy container waiting",
+							"reason", containerStatus.State.Waiting.Reason,
+							"message", containerStatus.State.Waiting.Message)
+					}
+
 					return fmt.Errorf("kube-rbac-proxy container is not in Ready state for pod %v", nbpod.Name)
 				}
 			}
@@ -661,6 +733,12 @@ func (tc *testContext) checkNotebookCullingStatus(nbMeta *metav1.ObjectMeta) (is
 }
 
 func (tc *testContext) testNotebookRBACProxySidecarResources(nbMeta *metav1.ObjectMeta) error {
+	logger := GetHelperLogger().WithValues(
+		"notebook", nbMeta.Name,
+		"namespace", nbMeta.Namespace,
+		"test", "rbac-sidecar-resources",
+	)
+
 	nbPods, err := tc.kubeClient.CoreV1().Pods(tc.testNamespace).List(tc.ctx, metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("statefulset=%s", nbMeta.Name)})
 
@@ -675,9 +753,42 @@ func (tc *testContext) testNotebookRBACProxySidecarResources(nbMeta *metav1.Obje
 		return fmt.Errorf("error getting notebook: %v", err)
 	}
 
+	logger.V(1).Info("Checking RBAC sidecar resources for notebook pods",
+		"podCount", len(nbPods.Items))
+
 	for _, nbpod := range nbPods.Items {
+		logger.V(1).Info("Checking pod status for resource validation",
+			"podName", nbpod.Name,
+			"phase", nbpod.Status.Phase)
+
 		if nbpod.Status.Phase != v1.PodRunning {
-			return fmt.Errorf("notebook pod %v is not in Running phase", nbpod.Name)
+			// Enhanced logging for non-running pods in resource validation
+			logger.Info("Pod is not in Running phase during resource validation - logging status",
+				"podName", nbpod.Name,
+				"currentPhase", nbpod.Status.Phase,
+				"message", nbpod.Status.Message,
+				"reason", nbpod.Status.Reason,
+				"startTime", nbpod.Status.StartTime)
+
+			// Log container statuses for debugging resource issues
+			for _, containerStatus := range nbpod.Status.ContainerStatuses {
+				logger.Info("Container status during resource validation",
+					"podName", nbpod.Name,
+					"containerName", containerStatus.Name,
+					"ready", containerStatus.Ready,
+					"restartCount", containerStatus.RestartCount)
+
+				if containerStatus.State.Waiting != nil {
+					logger.Info("Container waiting during resource validation",
+						"podName", nbpod.Name,
+						"containerName", containerStatus.Name,
+						"reason", containerStatus.State.Waiting.Reason,
+						"message", containerStatus.State.Waiting.Message)
+				}
+			}
+
+			return fmt.Errorf("notebook pod %v is not in Running phase (current: %s, reason: %s, message: %s)",
+				nbpod.Name, nbpod.Status.Phase, nbpod.Status.Reason, nbpod.Status.Message)
 		}
 
 		// Find rbac-proxy container
