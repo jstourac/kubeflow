@@ -231,6 +231,11 @@ func (r *OpenshiftNotebookReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	// Create the objects required by the OAuth proxy sidecar (see notebook_oauth.go file)
 	if OAuthInjectionIsEnabled(notebook.ObjectMeta) {
+		// Ensure any existing unauthenticated route is cleaned up before creating OAuth objects
+		err = r.EnsureUnauthenticatedRouteAbsent(notebook, ctx)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 
 		err = r.ReconcileOAuthServiceAccount(notebook, ctx)
 		if err != nil {
