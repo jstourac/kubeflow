@@ -11,9 +11,9 @@ func TestCompareNotebookHTTPRoutes_IgnoresExtraLabels(t *testing.T) {
 	r1 := gatewayv1.HTTPRoute{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
-				"notebook-name":      "nb",
-				"notebook-namespace": "ns",
-				"route-shard":        "blue",
+				notebookNameLabelKey:      "nb",
+				notebookNamespaceLabelKey: "ns",
+				"route-shard":             "blue",
 			},
 		},
 		Spec: gatewayv1.HTTPRouteSpec{},
@@ -22,8 +22,8 @@ func TestCompareNotebookHTTPRoutes_IgnoresExtraLabels(t *testing.T) {
 	r2 := gatewayv1.HTTPRoute{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
-				"notebook-name":      "nb",
-				"notebook-namespace": "ns",
+				notebookNameLabelKey:      "nb",
+				notebookNamespaceLabelKey: "ns",
 			},
 		},
 		Spec: gatewayv1.HTTPRouteSpec{},
@@ -38,8 +38,8 @@ func TestCompareNotebookHTTPRoutes_DetectsManagedLabelDrift(t *testing.T) {
 	r1 := gatewayv1.HTTPRoute{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
-				"notebook-name":      "nb",
-				"notebook-namespace": "ns",
+				notebookNameLabelKey:      "nb",
+				notebookNamespaceLabelKey: "ns",
 			},
 		},
 		Spec: gatewayv1.HTTPRouteSpec{},
@@ -48,8 +48,8 @@ func TestCompareNotebookHTTPRoutes_DetectsManagedLabelDrift(t *testing.T) {
 	r2 := gatewayv1.HTTPRoute{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
-				"notebook-name":      "nb2",
-				"notebook-namespace": "ns",
+				notebookNameLabelKey:      "nb2",
+				notebookNamespaceLabelKey: "ns",
 			},
 		},
 		Spec: gatewayv1.HTTPRouteSpec{},
@@ -59,4 +59,3 @@ func TestCompareNotebookHTTPRoutes_DetectsManagedLabelDrift(t *testing.T) {
 		t.Fatalf("expected routes to not match when managed label differs")
 	}
 }
-
