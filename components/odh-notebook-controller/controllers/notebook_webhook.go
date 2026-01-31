@@ -444,6 +444,13 @@ func (w *NotebookWebhook) Handle(ctx context.Context, req admission.Request) adm
 		}
 	}
 
+	// RHOAI 2.25 -> 3.x upgrade automation:
+	// If this Notebook still uses the legacy OAuth auth pattern, migrate it to the 3.x inject-auth
+	// model, but only in safe lifecycle moments (create/stop/restart) so we don't restart or disrupt
+	// a running workbench. Otherwise, add a lightweight "upgrade-pending" annotation so users know
+	// a stop/start is required.
+	ApplyUpgradeMigration(req.Operation, notebook)
+
 	// Inject the kube-rbac-proxy if the annotation is present
 	if KubeRbacProxyInjectionIsEnabled(notebook.ObjectMeta) {
 		// Inject kube-rbac-proxy
