@@ -45,8 +45,6 @@ const (
 	dspaInstanceName       = "dspa"
 	gatewayName            = "data-science-gateway"
 	gatewayNamespace       = "openshift-ingress"
-	managedByKey           = "opendatahub.io/managed-by"
-	managedByValue         = "workbenches"
 )
 
 func getDSPAInstance(ctx context.Context, k8sClient client.Client, namespace string, log logr.Logger) (*dspav1.DataSciencePipelinesApplication, error) {
@@ -351,7 +349,7 @@ func SyncElyraRuntimeConfigSecret(ctx context.Context, cli client.Client, config
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      elyraRuntimeSecretName,
 			Namespace: notebook.Namespace,
-			Labels:    map[string]string{managedByKey: managedByValue},
+			Labels:    map[string]string{ManagedByLabelKey: ManagedByLabelValue},
 		},
 		Type: corev1.SecretTypeOpaque,
 		Data: map[string][]byte{
@@ -390,7 +388,7 @@ func SyncElyraRuntimeConfigSecret(ctx context.Context, cli client.Client, config
 
 	// Update Secret
 	requiresUpdate := !reflect.DeepEqual(existingSecret.Data, desiredSecret.Data) ||
-		existingSecret.Labels[managedByKey] != managedByValue
+		existingSecret.Labels[ManagedByLabelKey] != ManagedByLabelValue
 
 	if requiresUpdate {
 		log.Info("Updating existing Elyra runtime config secret", "name", elyraRuntimeSecretName)
@@ -424,7 +422,7 @@ func MountElyraRuntimeConfigSecret(ctx context.Context, client client.Client, no
 	}
 
 	// Check that it's our managed secret and has expected data
-	if secret.Labels[managedByKey] != managedByValue {
+	if secret.Labels[ManagedByLabelKey] != ManagedByLabelValue {
 		log.Info("Skipping mounting secret not managed by workbenches", "secret", elyraRuntimeSecretName)
 		return nil
 	}

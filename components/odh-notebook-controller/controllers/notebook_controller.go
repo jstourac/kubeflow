@@ -568,7 +568,7 @@ func (r *OpenshiftNotebookReconciler) CreateNotebookCertConfigMap(notebook *nbv1
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "workbench-trusted-ca-bundle",
 				Namespace: notebook.Namespace,
-				Labels:    map[string]string{"opendatahub.io/managed-by": "workbenches"},
+				Labels:    map[string]string{ManagedByLabelKey: ManagedByLabelValue},
 			},
 			Data: map[string]string{
 				"ca-bundle.crt": string(bytes.Join(rootCertPool, []byte("\n"))),
@@ -724,8 +724,8 @@ func (r *OpenshiftNotebookReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				}
 
 				// Get the notebook labels from the HTTPRoute
-				notebookName := o.GetLabels()["notebook-name"]
-				notebookNamespace := o.GetLabels()["notebook-namespace"]
+				notebookName := o.GetLabels()[NotebookNameLabelKey]
+				notebookNamespace := o.GetLabels()[NotebookNamespaceLabelKey]
 
 				if notebookName == "" || notebookNamespace == "" {
 					return []reconcile.Request{}

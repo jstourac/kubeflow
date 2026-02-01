@@ -12,6 +12,7 @@ import (
 	"time"
 
 	nbv1 "github.com/kubeflow/kubeflow/components/notebook-controller/api/v1"
+	controllers "github.com/kubeflow/kubeflow/components/odh-notebook-controller/controllers"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
@@ -62,7 +63,7 @@ func (tc *testContext) getNotebookHTTPRoute(nbMeta *metav1.ObjectMeta) (*gateway
 
 	var opts []client.ListOption
 	opts = append(opts, client.InNamespace(nbMeta.Namespace))
-	opts = append(opts, client.MatchingLabels{"notebook-name": nbMeta.Name})
+	opts = append(opts, client.MatchingLabels{controllers.NotebookNameLabelKey: nbMeta.Name})
 	err := wait.PollUntilContextTimeout(tc.ctx, tc.resourceRetryInterval, tc.resourceCreationTimeout, false, func(ctx context.Context) (done bool, err error) {
 		routeErr := tc.customClient.List(ctx, &nbHTTPRouteList, opts...)
 		if routeErr != nil {

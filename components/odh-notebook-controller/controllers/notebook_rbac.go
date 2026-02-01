@@ -39,7 +39,7 @@ func NewRoleBinding(notebook *nbv1.Notebook, rolebindingName, roleRefKind, roleR
 			Name:      rolebindingName,
 			Namespace: notebook.Namespace,
 			Labels: map[string]string{
-				"notebook-name": notebook.Name,
+				NotebookNameLabelKey: notebook.Name,
 			},
 		},
 		Subjects: []rbacv1.Subject{

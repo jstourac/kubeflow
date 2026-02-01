@@ -9,6 +9,7 @@ import (
 	netv1 "k8s.io/api/networking/v1"
 
 	nbv1 "github.com/kubeflow/kubeflow/components/notebook-controller/api/v1"
+	controllers "github.com/kubeflow/kubeflow/components/odh-notebook-controller/controllers"
 	"github.com/stretchr/testify/require"
 	apiext "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -130,7 +131,7 @@ func (tc *testContext) testNotebookResourcesDeletion(nbMeta *metav1.ObjectMeta) 
 func isNetworkPolicyForNotebook(np *netv1.NetworkPolicy, notebookName string) bool {
 	// Check if the NetworkPolicy's podSelector has the notebook-name label
 	if np.Spec.PodSelector.MatchLabels != nil {
-		if labelValue, exists := np.Spec.PodSelector.MatchLabels["notebook-name"]; exists {
+		if labelValue, exists := np.Spec.PodSelector.MatchLabels[controllers.NotebookNameLabelKey]; exists {
 			return labelValue == notebookName
 		}
 	}

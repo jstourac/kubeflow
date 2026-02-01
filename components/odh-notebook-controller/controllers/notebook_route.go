@@ -40,12 +40,6 @@ const (
 	DefaultGatewayNamespace = "openshift-ingress"
 )
 
-// Controller-managed labels used for creating, finding and cleaning up HTTPRoutes.
-const (
-	notebookNameLabelKey      = "notebook-name"
-	notebookNamespaceLabelKey = "notebook-namespace"
-)
-
 // Environment variables for configuration:
 // - NOTEBOOK_GATEWAY_NAME: Override the Gateway name (default: "data-science-gateway")
 // - NOTEBOOK_GATEWAY_NAMESPACE: Override the Gateway namespace (default: "openshift-ingress")
@@ -62,8 +56,8 @@ func NewNotebookHTTPRoute(notebook *nbv1.Notebook, centralNamespace string) *gat
 		Name:      httpRouteName,
 		Namespace: centralNamespace, // Central protected namespace
 		Labels: map[string]string{
-			notebookNameLabelKey:      notebook.Name,
-			notebookNamespaceLabelKey: notebook.Namespace, // Critical for filtering and cleanup
+			NotebookNameLabelKey:      notebook.Name,
+			NotebookNamespaceLabelKey: notebook.Namespace, // Critical for filtering and cleanup
 		},
 	}
 
@@ -75,8 +69,8 @@ func NewNotebookHTTPRoute(notebook *nbv1.Notebook, centralNamespace string) *gat
 			GenerateName: prefix,
 			Namespace:    centralNamespace,
 			Labels: map[string]string{
-				notebookNameLabelKey:      notebook.Name,
-				notebookNamespaceLabelKey: notebook.Namespace,
+				NotebookNameLabelKey:      notebook.Name,
+				NotebookNamespaceLabelKey: notebook.Namespace,
 			},
 		}
 	}
@@ -142,8 +136,8 @@ func CompareNotebookHTTPRoutes(r1 gatewayv1.HTTPRoute, r2 gatewayv1.HTTPRoute) b
 	// Extra labels (e.g., added for sharding / policy / ops tooling) should not
 	// cause perpetual reconciliation.
 	managedLabelKeys := []string{
-		notebookNameLabelKey,
-		notebookNamespaceLabelKey,
+		NotebookNameLabelKey,
+		NotebookNamespaceLabelKey,
 	}
 
 	for _, k := range managedLabelKeys {
@@ -177,8 +171,8 @@ func (r *OpenshiftNotebookReconciler) reconcileHTTPRoute(notebook *nbv1.Notebook
 	opts := []client.ListOption{
 		client.InNamespace(r.Namespace), // Central namespace = controller's namespace
 		client.MatchingLabels{
-			notebookNameLabelKey:      notebook.Name,
-			notebookNamespaceLabelKey: notebook.Namespace,
+			NotebookNameLabelKey:      notebook.Name,
+			NotebookNamespaceLabelKey: notebook.Namespace,
 		},
 	}
 
@@ -262,8 +256,8 @@ func (r *OpenshiftNotebookReconciler) DeleteHTTPRouteForNotebook(notebook *nbv1.
 	opts := []client.ListOption{
 		client.InNamespace(r.Namespace), // Central namespace
 		client.MatchingLabels{
-			notebookNameLabelKey:      notebook.Name,
-			notebookNamespaceLabelKey: notebook.Namespace,
+			NotebookNameLabelKey:      notebook.Name,
+			NotebookNamespaceLabelKey: notebook.Namespace,
 		},
 	}
 
@@ -304,8 +298,8 @@ func (r *OpenshiftNotebookReconciler) EnsureConflictingHTTPRouteAbsent(
 	opts := []client.ListOption{
 		client.InNamespace(r.Namespace), // Central namespace
 		client.MatchingLabels{
-			notebookNameLabelKey:      notebook.Name,
-			notebookNamespaceLabelKey: notebook.Namespace,
+			NotebookNameLabelKey:      notebook.Name,
+			NotebookNamespaceLabelKey: notebook.Namespace,
 		},
 	}
 

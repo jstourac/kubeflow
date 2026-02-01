@@ -71,8 +71,8 @@ var _ = Describe("The Openshift Notebook controller", func() {
 				Name:      httpRouteName,
 				Namespace: odhNotebookControllerTestNamespace, // Central namespace
 				Labels: map[string]string{
-					"notebook-name":      Name,
-					"notebook-namespace": Namespace,
+					NotebookNameLabelKey:      Name,
+					NotebookNamespaceLabelKey: Namespace,
 				},
 			},
 			Spec: gatewayv1.HTTPRouteSpec{
@@ -172,8 +172,8 @@ var _ = Describe("The Openshift Notebook controller", func() {
 					Name:      shardedHTTPRouteName,
 					Namespace: odhNotebookControllerTestNamespace, // Central namespace
 					Labels: map[string]string{
-						"notebook-name":      shardedNotebookName,
-						"notebook-namespace": Namespace,
+						NotebookNameLabelKey:      shardedNotebookName,
+						NotebookNamespaceLabelKey: Namespace,
 					},
 				},
 				Spec: gatewayv1.HTTPRouteSpec{
@@ -261,8 +261,8 @@ var _ = Describe("The Openshift Notebook controller", func() {
 
 		It("Should delete the Openshift Route", func() {
 			By("By checking that the HTTPRoute has the correct labels for identification")
-			Expect(httpRoute.GetObjectMeta().GetLabels()).To(HaveKeyWithValue("notebook-name", Name))
-			Expect(httpRoute.GetObjectMeta().GetLabels()).To(HaveKeyWithValue("notebook-namespace", Namespace))
+			Expect(httpRoute.GetObjectMeta().GetLabels()).To(HaveKeyWithValue(NotebookNameLabelKey, Name))
+			Expect(httpRoute.GetObjectMeta().GetLabels()).To(HaveKeyWithValue(NotebookNamespaceLabelKey, Namespace))
 
 			By("By deleting the recently created Notebook")
 			Expect(cli.Delete(ctx, notebook)).Should(Succeed())
@@ -652,8 +652,8 @@ var _ = Describe("The Openshift Notebook controller", func() {
 				Name:      httpRouteName,
 				Namespace: odhNotebookControllerTestNamespace,
 				Labels: map[string]string{
-					"notebook-name":      Name,
-					"notebook-namespace": Namespace,
+					NotebookNameLabelKey:      Name,
+					NotebookNamespaceLabelKey: Namespace,
 				},
 			},
 			Spec: gatewayv1.HTTPRouteSpec{
@@ -752,8 +752,8 @@ var _ = Describe("The Openshift Notebook controller", func() {
 
 		It("Should delete the Openshift HTTPRoute", func() {
 			By("By checking that the HTTPRoute has the correct labels for identification")
-			Expect(httpRoute2.GetObjectMeta().GetLabels()).To(HaveKeyWithValue("notebook-name", Name))
-			Expect(httpRoute2.GetObjectMeta().GetLabels()).To(HaveKeyWithValue("notebook-namespace", Namespace))
+			Expect(httpRoute2.GetObjectMeta().GetLabels()).To(HaveKeyWithValue(NotebookNameLabelKey, Name))
+			Expect(httpRoute2.GetObjectMeta().GetLabels()).To(HaveKeyWithValue(NotebookNamespaceLabelKey, Namespace))
 
 			By("By deleting the recently created Notebook")
 			Expect(cli.Delete(ctx, notebook)).Should(Succeed())
@@ -903,7 +903,7 @@ var _ = Describe("The Openshift Notebook controller", func() {
 			Spec: netv1.NetworkPolicySpec{
 				PodSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{
-						"notebook-name": notebook.Name,
+						NotebookNameLabelKey: notebook.Name,
 					},
 				},
 				Ingress: []netv1.NetworkPolicyIngressRule{
@@ -954,7 +954,7 @@ var _ = Describe("The Openshift Notebook controller", func() {
 			Spec: netv1.NetworkPolicySpec{
 				PodSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{
-						"notebook-name": notebook.Name,
+						NotebookNameLabelKey: notebook.Name,
 					},
 				},
 				PolicyTypes: []netv1.PolicyType{
@@ -1065,7 +1065,7 @@ var _ = Describe("The Openshift Notebook controller", func() {
 				Name:      Name + KubeRbacProxyServiceSuffix,
 				Namespace: Namespace,
 				Labels: map[string]string{
-					"notebook-name": Name,
+					NotebookNameLabelKey: Name,
 				},
 				Annotations: map[string]string{
 					"service.beta.openshift.io/serving-cert-secret-name": Name + KubeRbacProxyTLSCertVolumeSecretSuffix,
@@ -1101,8 +1101,8 @@ var _ = Describe("The Openshift Notebook controller", func() {
 				Name:      httpRouteName,
 				Namespace: odhNotebookControllerTestNamespace, // Central namespace
 				Labels: map[string]string{
-					"notebook-name":      Name,
-					"notebook-namespace": Namespace,
+					NotebookNameLabelKey:      Name,
+					NotebookNamespaceLabelKey: Namespace,
 				},
 			},
 			Spec: gatewayv1.HTTPRouteSpec{
@@ -1150,7 +1150,7 @@ var _ = Describe("The Openshift Notebook controller", func() {
 				Name:      Name + KubeRbacProxyConfigSuffix,
 				Namespace: Namespace,
 				Labels: map[string]string{
-					"notebook-name": Name,
+					NotebookNameLabelKey: Name,
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
@@ -1435,8 +1435,8 @@ var _ = Describe("The Openshift Notebook controller", func() {
 			kubeRbacProxyHTTPRoute := &gatewayv1.HTTPRoute{}
 			routeKey := types.NamespacedName{Name: "nb-" + Namespace + "-" + Name, Namespace: odhNotebookControllerTestNamespace}
 			Expect(cli.Get(ctx, routeKey, kubeRbacProxyHTTPRoute)).Should(Succeed())
-			Expect(kubeRbacProxyHTTPRoute.GetObjectMeta().GetLabels()).To(HaveKeyWithValue("notebook-name", Name))
-			Expect(kubeRbacProxyHTTPRoute.GetObjectMeta().GetLabels()).To(HaveKeyWithValue("notebook-namespace", Namespace))
+			Expect(kubeRbacProxyHTTPRoute.GetObjectMeta().GetLabels()).To(HaveKeyWithValue(NotebookNameLabelKey, Name))
+			Expect(kubeRbacProxyHTTPRoute.GetObjectMeta().GetLabels()).To(HaveKeyWithValue(NotebookNamespaceLabelKey, Namespace))
 
 			By("By checking that the Notebook owns the kube-rbac-proxy ConfigMap object")
 			kubeRbacProxyConfigMap := &corev1.ConfigMap{}
@@ -1932,7 +1932,7 @@ func createExpectedServiceAccount(name, namespace string) corev1.ServiceAccount 
 			Name:      name,
 			Namespace: namespace,
 			Labels: map[string]string{
-				"notebook-name": name,
+				NotebookNameLabelKey: name,
 			},
 		},
 	}
@@ -2002,8 +2002,8 @@ func getHTTPRouteFromList(httpRoute *gatewayv1.HTTPRoute, name, namespace string
 	opts := []client.ListOption{
 		client.InNamespace(odhNotebookControllerTestNamespace), // Central namespace
 		client.MatchingLabels{
-			"notebook-name":      name,
-			"notebook-namespace": namespace,
+			NotebookNameLabelKey:      name,
+			NotebookNamespaceLabelKey: namespace,
 		},
 	}
 
@@ -2017,8 +2017,8 @@ func getHTTPRouteFromList(httpRoute *gatewayv1.HTTPRoute, name, namespace string
 	// Get the HTTPRoute from the list
 	for _, nHTTPRoute := range httpRouteList.Items {
 		// Match by labels since cross-namespace owner references don't work
-		if nHTTPRoute.Labels["notebook-name"] == name &&
-			nHTTPRoute.Labels["notebook-namespace"] == namespace {
+		if nHTTPRoute.Labels[NotebookNameLabelKey] == name &&
+			nHTTPRoute.Labels[NotebookNamespaceLabelKey] == namespace {
 			*httpRoute = nHTTPRoute
 			return httpRoute, nil
 		}

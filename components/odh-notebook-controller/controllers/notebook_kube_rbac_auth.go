@@ -55,7 +55,7 @@ func (r *OpenshiftNotebookReconciler) ReconcileNotebookServiceAccount(notebook *
 			Name:      notebook.Name,
 			Namespace: notebook.Namespace,
 			Labels: map[string]string{
-				"notebook-name": notebook.Name,
+				NotebookNameLabelKey: notebook.Name,
 			},
 		},
 	}
@@ -98,7 +98,7 @@ func NewNotebookKubeRbacProxyService(notebook *nbv1.Notebook) *corev1.Service {
 			Name:      notebook.Name + KubeRbacProxyServiceSuffix,
 			Namespace: notebook.Namespace,
 			Labels: map[string]string{
-				"notebook-name": notebook.Name,
+				NotebookNameLabelKey: notebook.Name,
 			},
 			Annotations: map[string]string{
 				"service.beta.openshift.io/serving-cert-secret-name": notebook.Name + KubeRbacProxyTLSCertVolumeSecretSuffix,
@@ -191,7 +191,7 @@ func NewNotebookKubeRbacProxyConfigMap(notebook *nbv1.Notebook) *corev1.ConfigMa
 			Name:      notebook.Name + KubeRbacProxyConfigSuffix,
 			Namespace: notebook.Namespace,
 			Labels: map[string]string{
-				"notebook-name": notebook.Name,
+				NotebookNameLabelKey: notebook.Name,
 			},
 		},
 		Data: map[string]string{
@@ -289,7 +289,7 @@ func NewNotebookKubeRbacProxyClusterRoleBinding(notebook *nbv1.Notebook) *rbacv1
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf("%s-rbac-%s-auth-delegator", notebook.Name, notebook.Namespace),
 			Labels: map[string]string{
-				"opendatahub.io/component": "notebook-controller",
+				ComponentLabelKey:          ComponentLabelValue,
 				"opendatahub.io/namespace": notebook.Namespace,
 			},
 		},

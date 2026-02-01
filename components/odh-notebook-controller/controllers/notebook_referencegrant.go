@@ -42,8 +42,8 @@ func NewNotebookReferenceGrant(namespace string, centralNamespace string) *gatew
 			Name:      ReferenceGrantName,
 			Namespace: namespace, // User namespace where Services live
 			Labels: map[string]string{
-				"app.kubernetes.io/managed-by": "odh-notebook-controller",
-				"opendatahub.io/component":     "notebook-controller",
+				AppManagedByLabelKey: AppManagedByLabelValue,
+				ComponentLabelKey:    ComponentLabelValue,
 			},
 		},
 		Spec: gatewayv1beta1.ReferenceGrantSpec{

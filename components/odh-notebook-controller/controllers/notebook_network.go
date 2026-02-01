@@ -146,7 +146,7 @@ func NewNotebookNetworkPolicy(notebook *nbv1.Notebook, log logr.Logger, namespac
 		Spec: netv1.NetworkPolicySpec{
 			PodSelector: metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"notebook-name": notebook.Name,
+					NotebookNameLabelKey: notebook.Name,
 				},
 			},
 			Ingress: []netv1.NetworkPolicyIngressRule{
@@ -187,7 +187,7 @@ func NewKubeRbacProxyNetworkPolicy(notebook *nbv1.Notebook) *netv1.NetworkPolicy
 		Spec: netv1.NetworkPolicySpec{
 			PodSelector: metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"notebook-name": notebook.Name,
+					NotebookNameLabelKey: notebook.Name,
 				},
 			},
 			Ingress: []netv1.NetworkPolicyIngressRule{

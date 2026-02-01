@@ -640,7 +640,7 @@ func CheckAndMountCACertBundle(ctx context.Context, cli client.Client, notebook 
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      workbenchConfigMapName,
 				Namespace: notebook.Namespace,
-				Labels:    map[string]string{"opendatahub.io/managed-by": "workbenches"},
+				Labels:    map[string]string{ManagedByLabelKey: ManagedByLabelValue},
 			},
 			Data: map[string]string{
 				"ca-bundle.crt": odhConfigMap.Data["ca-bundle.crt"],

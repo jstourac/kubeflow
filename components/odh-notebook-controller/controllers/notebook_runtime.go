@@ -72,7 +72,7 @@ func SyncRuntimeImagesConfigMap(ctx context.Context, cli client.Client, log logr
 	data := make(map[string]string)
 	for _, item := range imagestreams.Items {
 		labels := item.GetLabels()
-		if labels["opendatahub.io/runtime-image"] == "true" {
+		if labels[RuntimeImageLabelKey] == "true" {
 			tags, found, err := unstructured.NestedSlice(item.Object, "spec", "tags")
 			if err != nil || !found {
 				log.Error(err, "Failed to extract tags from ImageStream", "ImageStream", item.GetName())
@@ -147,7 +147,7 @@ func SyncRuntimeImagesConfigMap(ctx context.Context, cli client.Client, log logr
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      configMapName,
 			Namespace: notebookNamespace,
-			Labels:    map[string]string{"opendatahub.io/managed-by": "workbenches"},
+			Labels:    map[string]string{ManagedByLabelKey: ManagedByLabelValue},
 		},
 		Data: data,
 	}

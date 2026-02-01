@@ -157,7 +157,7 @@ var _ = Describe("Runtime images ConfigMap should be mounted", func() {
 						Name:      "some-image",
 						Namespace: "redhat-ods-applications",
 						Labels: map[string]string{
-							"opendatahub.io/runtime-image": "true",
+							RuntimeImageLabelKey: "true",
 						},
 					},
 					Spec: imagev1.ImageStreamSpec{
@@ -232,7 +232,7 @@ var _ = Describe("Runtime images ConfigMap should be mounted", func() {
 						Name:      "some-image",
 						Namespace: "redhat-ods-applications",
 						Labels: map[string]string{
-							"opendatahub.io/runtime-image": "true",
+							RuntimeImageLabelKey: "true",
 						},
 					},
 					Spec: imagev1.ImageStreamSpec{
@@ -281,7 +281,7 @@ var _ = Describe("Runtime images ConfigMap should be mounted", func() {
 						Name:      "some-image",
 						Namespace: "redhat-ods-applications",
 						Labels: map[string]string{
-							"opendatahub.io/runtime-image": "true",
+							RuntimeImageLabelKey: "true",
 						},
 					},
 					Spec: imagev1.ImageStreamSpec{
@@ -334,7 +334,7 @@ var _ = Describe("Runtime images ConfigMap should be mounted", func() {
 						Name:      "format-key-test-image",
 						Namespace: "redhat-ods-applications",
 						Labels: map[string]string{
-							"opendatahub.io/runtime-image": "true",
+							RuntimeImageLabelKey: "true",
 						},
 					},
 					Spec: imagev1.ImageStreamSpec{
