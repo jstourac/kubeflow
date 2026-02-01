@@ -59,4 +59,3 @@ func TestCompareNotebookHTTPRoutes_DetectsManagedLabelDrift(t *testing.T) {
 		t.Fatalf("expected routes to not match when managed label differs")
 	}
 }
-
