@@ -356,7 +356,7 @@ var _ = Describe("The Openshift Notebook controller", func() {
 				return cli.Update(ctx, referenceGrant)
 			}, duration, interval).Should(Succeed())
 
-			By("By checking that the controller has restored the ReferenceGrant labels")
+			By("By checking that the controller has restored the managed ReferenceGrant labels (without removing extra labels)")
 			Eventually(func() map[string]string {
 				if err := cli.Get(ctx, referenceGrantKey, referenceGrant); err != nil {
 					return nil
@@ -365,6 +365,7 @@ var _ = Describe("The Openshift Notebook controller", func() {
 			}, duration, interval).Should(And(
 				HaveKeyWithValue("app.kubernetes.io/managed-by", "odh-notebook-controller"),
 				HaveKeyWithValue("opendatahub.io/component", "notebook-controller"),
+				HaveKeyWithValue("wrong-label", "wrong-value"),
 			))
 		})
 
