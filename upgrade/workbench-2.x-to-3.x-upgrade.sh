@@ -84,6 +84,19 @@ patch_workbench() {
         .spec.template.spec.volumes // [] | to_entries[] |
         select(.value.name | IN("oauth-config", "oauth-client", "tls-certificates")) |
         {"op":"remove", "path": "/spec/template/spec/volumes/\(.key)"}
+      ),
+      (
+        # Strip --ServerApp.tornado_settings=... from the NOTEBOOK_ARGS env var.
+        # This setting carried OAuth-proxy user/hub metadata that is no longer
+        # needed with kube-rbac-proxy in 3.x.
+        .spec.template.spec.containers | to_entries[] |
+        .key as $ci |
+        .value.env // [] | to_entries[] |
+        select(.value.name == "NOTEBOOK_ARGS") |
+        select(.value.value | test("--ServerApp\\.tornado_settings=")) |
+        .key as $ei |
+        (.value.value | gsub("[\\n\\r\\t ]*--ServerApp\\.tornado_settings=[^\\n]*"; "")) as $new_val |
+        {"op":"replace", "path": "/spec/template/spec/containers/\($ci)/env/\($ei)/value", "value": $new_val}
       )
     ] | sort_by(.path) | reverse')
 
@@ -158,6 +171,16 @@ verify_workbench() {
     else
         echo "  FAIL: Legacy inject-oauth annotation still exists: '$OAUTH'"
         pass=false
+    fi
+
+    # Check that --ServerApp.tornado_settings is removed from NOTEBOOK_ARGS
+    NB_ARGS=$(oc get notebook "$name" -n "$namespace" -o json 2>/dev/null \
+        | jq -r '.spec.template.spec.containers[].env // [] | .[] | select(.name == "NOTEBOOK_ARGS") | .value' 2>/dev/null)
+    if echo "$NB_ARGS" | grep -q -- "--ServerApp.tornado_settings="; then
+        echo "  FAIL: --ServerApp.tornado_settings still present in NOTEBOOK_ARGS"
+        pass=false
+    else
+        echo "  PASS: --ServerApp.tornado_settings removed from NOTEBOOK_ARGS"
     fi
 
     # Check sidecar containers
