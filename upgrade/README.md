@@ -42,12 +42,20 @@ Helper script for migrating RHOAI workbenches from the OAuth-proxy auth model (R
 ./workbench-2.x-to-3.x-upgrade.sh verify --name my-wb --namespace my-ns
 ```
 
+## Important: stop workbenches before patching
+
+The patch operation modifies the notebook CR and deletes its StatefulSet, which causes
+running workbenches to restart. To avoid potential data loss or disruption to users,
+**stop all affected workbenches before running the patch** and start them again
+afterwards.
+
 ## Recommended workflow
 
-1. **Patch** — `./workbench-2.x-to-3.x-upgrade.sh patch --all`
-2. **Verify** — `./workbench-2.x-to-3.x-upgrade.sh verify --all`
-3. **Cleanup** (optional) — `./workbench-2.x-to-3.x-upgrade.sh cleanup --all`
+1. **Stop** all workbenches that will be migrated (via the RHOAI Dashboard or `oc`).
+2. **Patch** — `./workbench-2.x-to-3.x-upgrade.sh patch --all`
+3. **Verify** — `./workbench-2.x-to-3.x-upgrade.sh verify --all`
+4. **Cleanup** (optional) — `./workbench-2.x-to-3.x-upgrade.sh cleanup --all`
+5. **Start** the workbenches again.
 
 > **Note:**
-> During migration (patch), each running workbench is automatically restarted for the changes to take full effect.
-> In case of workbenches managed by Kueue, you may have to restart these manually to boot up properly if they were in running state before.
+> In case of workbenches managed by Kueue, you may have to restart these manually to boot up properly if they were in running state before the migration.

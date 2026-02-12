@@ -8,6 +8,10 @@
 # Usage:
 #   ./workbench-2.x-to-3.x-upgrade.sh <command> [--name NAME --namespace NAMESPACE | --all]
 #
+# IMPORTANT: The patch operation causes running workbenches to restart.
+# Stop all affected workbenches before patching to avoid data loss or
+# disruption to users, and start them again afterwards.
+#
 # Commands:
 #   patch    - Patch notebook resources for 3.x auth model
 #   cleanup  - Remove stale OAuth routes, secrets, and OAuthClients
@@ -32,6 +36,7 @@ Usage: $(basename "$0") <command> [options]
 Commands:
   patch    Patch notebook CR for the 3.x auth model (removes oauth-proxy
            sidecar, adds inject-auth annotation, deletes StatefulSet).
+           WARNING: This causes running workbenches to restart. Stop them first.
   cleanup  Remove leftover OAuth resources (Route, Services, Secrets,
            OAuthClient) that are no longer needed after migration.
   verify   Check that the migration was applied correctly.
@@ -108,8 +113,9 @@ patch_workbench() {
 
     # Apply the patch and delete the StatefulSet to work around the kueue
     # webhook sync issue: https://issues.redhat.com/browse/RHOAIENG-49007
-    # NOTE: The workbench must be stopped, or if it was running, it needs to
-    #       be stopped and started again after this operation.
+    # WARNING: This causes running workbenches to restart. All affected
+    #          workbenches should be stopped before running this operation
+    #          to avoid data loss or user disruption.
     oc patch notebook "$name" -n "$namespace" --type='json' -p="$PATCH" \
         && oc delete statefulset -n "$namespace" "$name"
 
