@@ -19,7 +19,7 @@ require_kind_dependencies() {
 }
 
 kind_cluster_exists() {
-  kind get clusters 2>/dev/null | rg -x "${KIND_CLUSTER_NAME}" >/dev/null 2>&1
+  kind get clusters 2>/dev/null | grep -Fx "${KIND_CLUSTER_NAME}" >/dev/null 2>&1
 }
 
 ensure_kind_cluster() {

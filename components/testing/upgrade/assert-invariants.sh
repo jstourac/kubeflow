@@ -17,7 +17,7 @@ fail() {
 read_pod_line() {
   local file="$1"
   local pod_name="$2"
-  rg "^${pod_name}[[:space:]]" "${file}" | awk 'NR==1 {print $0}'
+  grep -E "^${pod_name}[[:space:]]" "${file}" | awk 'NR==1 {print $0}'
 }
 
 sum_restart_counts() {
@@ -96,10 +96,10 @@ assert_logs() {
   local pattern='(panic|fatal|segmentation fault|admission webhook.*error|reconcile.*error)'
 
   if [[ "${STRICT_LOGS}" == "true" ]]; then
-    if [[ -f "${odh_log}" ]] && rg -i "${pattern}" "${odh_log}" >/dev/null; then
+    if [[ -f "${odh_log}" ]] && grep -Eqi "${pattern}" "${odh_log}"; then
       fail "strict log check matched failure pattern in ODH controller log"
     fi
-    if [[ -f "${kf_log}" ]] && rg -i "${pattern}" "${kf_log}" >/dev/null; then
+    if [[ -f "${kf_log}" ]] && grep -Eqi "${pattern}" "${kf_log}"; then
       fail "strict log check matched failure pattern in KF controller log"
     fi
   fi
