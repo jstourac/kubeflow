@@ -1,0 +1,108 @@
+name: ODH Notebook Controller Upgrade Test
+on:
+  pull_request:
+    branches:
+      - main
+      - v1.10-branch
+    paths:
+      - .github/workflows/odh_notebook_controller_upgrade_test.yaml
+      - components/notebook-controller/**
+      - components/odh-notebook-controller/**
+      - components/testing/upgrade/**
+  workflow_dispatch:
+    inputs:
+      baseline_kf_image:
+        description: Baseline notebook-controller image
+        required: false
+        default: quay.io/opendatahub/kubeflow-notebook-controller:main
+      baseline_odh_image:
+        description: Baseline odh-notebook-controller image
+        required: false
+        default: quay.io/opendatahub/odh-notebook-controller:main
+      strict_logs:
+        description: Fail if known error patterns are found in controller logs
+        required: false
+        type: boolean
+        default: false
+
+env:
+  TAG: upgrade-test
+
+jobs:
+  upgrade-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install podman and dependencies
+        run: |
+          sudo mkdir -p /etc/apt/keyrings
+          curl -fsSL https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/unstable/xUbuntu_$(lsb_release -rs)/Release.key \
+            | gpg --dearmor \
+            | sudo tee /etc/apt/keyrings/devel_kubic_libcontainers_unstable.gpg > /dev/null
+          echo \
+            "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/devel_kubic_libcontainers_unstable.gpg]\
+              https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/unstable/xUbuntu_$(lsb_release -rs)/ /" \
+            | sudo tee /etc/apt/sources.list.d/devel:kubic:libcontainers:unstable.list > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get -qq -y install podman ripgrep
+          podman version
+
+          # temporary fix for https://github.com/containers/podman/issues/21024
+          wget https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_22.04/amd64/conmon_2.1.2~0_amd64.deb -O /tmp/conmon_2.1.2.deb
+          sudo apt install /tmp/conmon_2.1.2.deb
+
+          systemctl --user daemon-reload
+          systemctl --user start podman.socket
+
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          check-latest: true
+          go-version-file: components/odh-notebook-controller/go.mod
+          cache-dependency-path: |
+            components/notebook-controller/go.sum
+            components/odh-notebook-controller/go.sum
+
+      - name: Build target Notebook Controller image
+        run: |
+          cd components/notebook-controller
+          make docker-build
+        env:
+          IMG: localhost/notebook-controller
+          TAG: ${{ env.TAG }}
+          CACHE_IMAGE: ghcr.io/${{ github.repository }}/components/notebook-controller/build-cache
+
+      - name: Build target ODH Notebook Controller image
+        run: |
+          cd components/odh-notebook-controller
+          make docker-build
+        env:
+          IMG: localhost/odh-notebook-controller
+          TAG: ${{ env.TAG }}
+          CACHE_IMAGE: ghcr.io/${{ github.repository }}/components/odh-notebook-controller/build-cache
+
+      - name: Install KinD
+        run: ./components/testing/gh-actions/install_kind.sh
+
+      - name: Install kustomize
+        run: ./components/testing/gh-actions/install_kustomize.sh
+
+      - name: Run upgrade test
+        run: |
+          bash ./components/testing/upgrade/run-upgrade-test.sh \
+            --mode kind \
+            --baseline-kf-image "${{ github.event.inputs.baseline_kf_image || 'quay.io/opendatahub/kubeflow-notebook-controller:main' }}" \
+            --baseline-odh-image "${{ github.event.inputs.baseline_odh_image || 'quay.io/opendatahub/odh-notebook-controller:main' }}" \
+            --target-kf-image "localhost/notebook-controller:${{ env.TAG }}" \
+            --target-odh-image "localhost/odh-notebook-controller:${{ env.TAG }}" \
+            --strict-logs "${{ github.event.inputs.strict_logs || 'false' }}"
+
+      - name: Upload upgrade test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: odh-notebook-controller-upgrade-artifacts
+          path: components/testing/upgrade/artifacts/
+          if-no-files-found: warn
