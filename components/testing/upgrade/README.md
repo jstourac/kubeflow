@@ -47,7 +47,7 @@ The test performs:
 
 Prerequisites:
 
-- `kubectl`, `kustomize`, `kind`, `podman`, `openssl`, `rg`
+- `kubectl`, `kustomize`, `kind`, `podman`, `openssl`, `grep`
 - for OpenShift mode: `oc` and logged-in cluster
 
 Build target images from current checkout:
