@@ -41,18 +41,16 @@ func TestNotebooksForDSPA_RHOAIENG4531(t *testing.T) {
 	}
 
 	tests := []struct {
-		name              string
-		setPipelineSecret string
-		dspaNamespace     string
-		notebooks         []nbv1.Notebook
-		wantCount         int
-		wantNamespaces    []string
-		wantNames         []string
+		name           string
+		dspaNamespace  string
+		notebooks      []nbv1.Notebook
+		wantCount      int
+		wantNamespaces []string
+		wantNames      []string
 	}{
 		{
-			name:              "returns reconcile requests for all notebooks in DSPA namespace",
-			setPipelineSecret: "true",
-			dspaNamespace:     "test-ns",
+			name:          "returns reconcile requests for all notebooks in DSPA namespace",
+			dspaNamespace: "test-ns",
 			notebooks: []nbv1.Notebook{
 				newTestNotebook("nb1", "test-ns"),
 				newTestNotebook("nb2", "test-ns"),
@@ -62,45 +60,14 @@ func TestNotebooksForDSPA_RHOAIENG4531(t *testing.T) {
 			wantNames:      []string{"nb1", "nb2"},
 		},
 		{
-			name:              "returns empty when SET_PIPELINE_SECRET is not true",
-			setPipelineSecret: "false",
-			dspaNamespace:     "test-ns",
-			notebooks: []nbv1.Notebook{
-				newTestNotebook("nb1", "test-ns"),
-			},
-			wantCount: 0,
+			name:          "returns empty when no notebooks exist in namespace",
+			dspaNamespace: "empty-ns",
+			notebooks:     []nbv1.Notebook{},
+			wantCount:     0,
 		},
 		{
-			name:              "returns empty when SET_PIPELINE_SECRET is unset",
-			setPipelineSecret: "",
-			dspaNamespace:     "test-ns",
-			notebooks: []nbv1.Notebook{
-				newTestNotebook("nb1", "test-ns"),
-			},
-			wantCount: 0,
-		},
-		{
-			name:              "returns empty when no notebooks exist in namespace",
-			setPipelineSecret: "true",
-			dspaNamespace:     "empty-ns",
-			notebooks:         []nbv1.Notebook{},
-			wantCount:         0,
-		},
-		{
-			name:              "handles SET_PIPELINE_SECRET with whitespace and mixed case",
-			setPipelineSecret: "  True  ",
-			dspaNamespace:     "test-ns",
-			notebooks: []nbv1.Notebook{
-				newTestNotebook("nb1", "test-ns"),
-			},
-			wantCount:      1,
-			wantNamespaces: []string{"test-ns"},
-			wantNames:      []string{"nb1"},
-		},
-		{
-			name:              "only returns notebooks from DSPA namespace, not other namespaces",
-			setPipelineSecret: "true",
-			dspaNamespace:     "target-ns",
+			name:          "only returns notebooks from DSPA namespace, not other namespaces",
+			dspaNamespace: "target-ns",
 			notebooks: []nbv1.Notebook{
 				newTestNotebook("nb-target", "target-ns"),
 				newTestNotebook("nb-other", "other-ns"),
@@ -113,11 +80,6 @@ func TestNotebooksForDSPA_RHOAIENG4531(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Set env var — t.Setenv automatically restores on subtest cleanup
-			if tt.setPipelineSecret != "" {
-				t.Setenv("SET_PIPELINE_SECRET", tt.setPipelineSecret)
-			}
-
 			// Build fake client with notebooks
 			objs := make([]runtime.Object, len(tt.notebooks))
 			for i := range tt.notebooks {

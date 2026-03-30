@@ -725,11 +725,6 @@ func (r *OpenshiftNotebookReconciler) UnsetNotebookCertConfig(notebook *nbv1.Not
 // configuration changes (e.g., credential rotation, storage update, deletion).
 // Fix for RHOAIENG-4531.
 func (r *OpenshiftNotebookReconciler) notebooksForDSPA(ctx context.Context, o client.Object) []reconcile.Request {
-	// Only trigger if Elyra secret sync is enabled
-	if strings.ToLower(strings.TrimSpace(os.Getenv("SET_PIPELINE_SECRET"))) != "true" {
-		return []reconcile.Request{}
-	}
-
 	log := r.Log.WithValues("namespace", o.GetNamespace(), "dspa", o.GetName())
 
 	var nbList nbv1.NotebookList
@@ -834,15 +829,6 @@ func (r *OpenshiftNotebookReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			}),
 		).
 
-		// Watch for DSPA changes to keep the Elyra runtime config secret in sync.
-		// When a DSPA is created, updated, or deleted, reconcile all notebooks in
-		// the same namespace so the ds-pipeline-config secret is updated.
-		// Fix for RHOAIENG-4531: without this Watch, credential rotations and
-		// external DSPA deletions are not detected.
-		Watches(&dspav1.DataSciencePipelinesApplication{},
-			handler.EnqueueRequestsFromMapFunc(r.notebooksForDSPA),
-		).
-
 		// Watch for all the required ConfigMaps
 		// odh-trusted-ca-bundle, kube-root-ca.crt, workbench-trusted-ca-bundle
 		// and reconcile the workbench-trusted-ca-bundle ConfigMap,
@@ -906,9 +892,15 @@ func (r *OpenshiftNotebookReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				return []reconcile.Request{}
 			}),
 		)
-	err := builder.Complete(r)
-	if err != nil {
-		return err
+	// Watch for DSPA changes to keep the Elyra runtime config secret in sync.
+	// Only register the Watch when SET_PIPELINE_SECRET is enabled, so the
+	// controller can start in environments where the DSPA CRD is not installed.
+	// Fix for RHOAIENG-4531.
+	if strings.ToLower(strings.TrimSpace(os.Getenv("SET_PIPELINE_SECRET"))) == "true" {
+		builder = builder.Watches(&dspav1.DataSciencePipelinesApplication{},
+			handler.EnqueueRequestsFromMapFunc(r.notebooksForDSPA),
+		)
 	}
-	return nil
+
+	return builder.Complete(r)
 }
