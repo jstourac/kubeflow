@@ -50,28 +50,49 @@ Pass `E2E_TEST_FLAGS="--skip-deletion=true"` to skip notebook deletion tests.
 ## Chaos Validation (operator-chaos)
 
 This repo integrates [operator-chaos](https://github.com/opendatahub-io/operator-chaos)
-for shift-left upgrade validation (**Level 1 + L2 elements**).
+for shift-left upgrade validation (**Level 1-3**).
+
+### Knowledge model and CI (L1 + L2)
 
 A repo-local knowledge model at `chaos/knowledge/workbenches.yaml` describes
 the operator topology (Deployments, ServiceAccounts, webhooks, steady-state
-checks). A GitHub Actions workflow (`.github/workflows/operator_chaos_validation.yaml`)
-runs on PRs that touch API types, controllers, CRDs, or the knowledge model and:
+checks). Experiment definitions live in `chaos/experiments/`.
+
+A GitHub Actions workflow (`.github/workflows/operator_chaos_validation.yaml`)
+runs on PRs that touch API types, controllers, CRDs, or the chaos artifacts and:
 
 - validates the knowledge model (`validate --knowledge`, `preflight --local`)
+- validates experiment definitions (`validate` for each YAML in `chaos/experiments/`)
 - diffs the knowledge model between base and PR branches (`diff --breaking`)
 - diffs the Notebook CRD schema between base and PR branches (`diff-crds`)
 - previews upgrade experiments (`simulate-upgrade --dry-run`)
+- runs ChaosClient SDK integration tests (`make test-chaos`)
+
+### ChaosClient SDK tests (L3)
+
+The `controllers/notebook_chaos_test.go` file in `odh-notebook-controller`
+wraps the envtest client with `sdk.NewChaosClient` to inject API-level faults
+into the `OpenshiftNotebookReconciler` during Ginkgo tests. Covered scenarios:
+
+- Get/Create errors propagate as `sdk.ChaosError`
+- Transient faults: reconciler converges after `FaultConfig.Deactivate()`
+- Update faults with no drift: reconciler stays healthy
+- Intermittent errors (15% rate): reconciler eventually converges
 
 ### Local validation
 ```sh
 cd components/odh-notebook-controller
 make chaos-validate   # validates knowledge model + preflight
+make test-chaos       # runs ChaosClient SDK integration tests
 ```
 
 ### Maintenance
 
 When CRDs, webhooks, or managed resources change, update
-`chaos/knowledge/workbenches.yaml` in the same PR.
+`chaos/knowledge/workbenches.yaml` and the experiment YAMLs in
+`chaos/experiments/` in the same PR. If the reconciler gains new
+sub-reconcilers or API operations, consider adding corresponding
+chaos test scenarios in `notebook_chaos_test.go`.
 
 ## Debug
 

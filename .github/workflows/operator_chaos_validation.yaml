@@ -64,6 +64,15 @@ jobs:
           set -euo pipefail
           operator-chaos validate --knowledge chaos/knowledge/workbenches.yaml
 
+      - name: Validate experiment definitions
+        shell: bash
+        run: |
+          set -euo pipefail
+          for f in chaos/experiments/*.yaml; do
+            echo "Validating ${f}..."
+            operator-chaos validate "${f}"
+          done
+
       - name: Run local preflight
         shell: bash
         run: |
@@ -152,3 +161,10 @@ jobs:
             --source "${base_knowledge}" \
             --target chaos/knowledge \
             --dry-run
+
+      - name: Run chaos SDK tests
+        shell: bash
+        working-directory: components/odh-notebook-controller
+        run: |
+          set -euo pipefail
+          make test-chaos
